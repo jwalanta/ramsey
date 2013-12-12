@@ -3,6 +3,7 @@
 #include <vector>
 #include <set>
 #include <gmpxx.h>
+#include <ctime>
 
 #ifndef SOLVER_H
 #define SOLVER_H
@@ -32,6 +33,7 @@ class Solver{
         std::vector<Constraint> constraint;
         std::set<BIGINT> old_graphs, new_graphs, *old_graphs_ptr, *new_graphs_ptr;
         int order;
+        clock_t begin;
 
     public:
         Solver();
@@ -42,12 +44,15 @@ class Solver{
         void print_constraint();
 
         void solve(int vertices);
-        bool check(BIGINT n);
+        int check(BIGINT n);
 
         int popcount(BIGINT n);
         std::string get_g6(BIGINT n, int m);
 
         void solve_ramsey(int s, int t);
+
+        void add_edge(BIGINT y, BIGINT edge, int vertices, int edge_start, int shift);
+        void solve_using_edges(int vertices);
 };
 
 #endif

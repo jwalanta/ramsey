@@ -52,7 +52,24 @@ void y_to_g6(BIGINT y, int n, char* s){
         m-=6;
     }
 
+    *s++ = '\n';
     *s = '\0';
+
+}
+
+void y_to_graph(BIGINT y, int n, graph *g){
+
+    int i,j, count=0;
+    int m = (n + WORDSIZE - 1) / WORDSIZE;
+
+    EMPTYGRAPH(g,m,n);
+
+    for (j=1;j<n;j++){
+        for (i=0;i<j;i++){
+            if (y&1) ADDONEEDGE(g,i,j,m);
+            y>>=1;
+        }
+    }
 
 }
 
@@ -96,16 +113,38 @@ BIGINT g6_to_y(char* s){
 
 }
 
-BIGINT canon_label(BIGINT y, int nv){
+BIGINT graph_to_y(graph *g, int n){
 
-    y_to_g6(y, nv, buffer);
+    int i,j, count=0;
+    int m = (n + WORDSIZE - 1) / WORDSIZE;
+    set *gj;
+
+    BIGINT y=0;
+
+    for (j=n-1;j>0;j--){
+        gj = GRAPHROW(g,j,m);
+        for (i=j-1;i>=0;i--){
+            y<<=1;
+            if (ISELEMENT(gj,i)) y|=1;
+        }
+    }
+
+    return y;
+
+}
+
+BIGINT canon_label(BIGINT y, int nv){
 
     // get number of vertices and m
     int m = (nv + WORDSIZE - 1) / WORDSIZE;
-    nauty_check(WORDSIZE, m, nv, NAUTYVERSIONID);
+    //nauty_check(WORDSIZE, m, nv, NAUTYVERSIONID);
 
     // convert string to graph
-    stringtograph(buffer, g, m);
+    //y_to_g6(y, nv, buffer);
+    //stringtograph(buffer, g, m);
+
+    // convert y to graph
+    y_to_graph(y, nv, g);
 
     // set canonical flag
     options.getcanon = TRUE;
@@ -113,8 +152,9 @@ BIGINT canon_label(BIGINT y, int nv){
     // canonically label graph
     nauty(g, lab, ptn, NULL, orbits, &options, &stats, workspace, 64 * m, m, nv, canon_g);
 
-    strcpy(buffer, ntog6(canon_g, m, nv));
-    return g6_to_y(buffer);
+    return graph_to_y(canon_g, nv);
+    //strcpy(buffer, ntog6(canon_g, m, nv));
+    //return g6_to_y(buffer);
 
 }
 

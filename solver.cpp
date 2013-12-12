@@ -159,7 +159,7 @@ void Solver::solve(int vertices){
             }
             */             
 
-            if (check(n)){
+            if (check(n)==0){
                 new_graphs_ptr->insert(canon_label(n,vertices));
                 //new_graphs_ptr->insert(n);
             }
@@ -168,8 +168,59 @@ void Solver::solve(int vertices){
     }
 }
 
+void Solver::add_edge(BIGINT y, BIGINT edge, int vertices, int edge_start, int shift){
 
-bool Solver::check(BIGINT n){
+    if (edge_start>=vertices) return;
+
+    BIGINT n, e;
+
+    // prepare new graph using this edge
+    n=edge;
+    n<<=shift;
+    n|=y;
+
+    int c = check(n);
+    if (c==0){
+        // ramsey graph
+        new_graphs_ptr->insert(canon_label(n,vertices));
+    }
+    else{
+        // since this is not a ramsey graph
+        // no point adding new edges
+
+        // c==1 means the check failed for cliques
+        // c==2 means it failed for independent set
+
+        if (c==1) return;
+        //return;
+    }
+
+    for (int i=edge_start; i<vertices-1; ++i){
+
+        // prepare edge
+        e=1;
+        e<<=i;
+
+        add_edge(y, edge|e, vertices, i+1, shift);
+
+    }
+
+}
+
+
+void Solver::solve_using_edges(int vertices){
+
+    // shift count for new edges
+    int shift = (vertices-1)*(vertices-2)/2;
+
+    // add edges to each Ramsey graph from previous graph order
+    for (std::set<BIGINT>::iterator it=old_graphs_ptr->begin(); it!=old_graphs_ptr->end(); ++it){
+        add_edge(*it, 0, vertices, 0, shift);
+    }
+}
+
+
+int Solver::check(BIGINT n){
 
 	BIGINT t;
 
@@ -181,25 +232,28 @@ bool Solver::check(BIGINT n){
 		if (constraint[i].sign == '<'){
 			if (popcount(t) >= constraint[i].rhs){
 				// doesnt satisfy
-				return false;
+				return 1;
 			}
 		}
 		
 		if (constraint[i].sign == '>'){
 			if (popcount(t) <= constraint[i].rhs){
 				// doesnt satisfy
-				return false;
+				return 2;
 			}
 		}
 
 	}
 
-	return true;
+	return 0;
 
 
 }
 
 void Solver::solve_ramsey(int s, int t){
+
+    // start clock
+    begin = clock();
 
     // ramsey graphs upto n<=2 are same
 
@@ -242,18 +296,6 @@ void Solver::solve_ramsey(int s, int t){
         BIGINT min_constraint = 1;
         min_constraint<<=shift;
 
-        // get combinations for K_t 
-        v.clear();
-        tmp.clear();
-        get_combinations(v,n,t,tmp);
-        for (i=0;i<v.size();i++){
-            c.lhs = v[i];
-            c.sign = '>';
-            c.rhs = 0;
-            if (c.lhs >= min_constraint) add_constraint(c);
-            //add_constraint(c);
-        }
-
         // get combinations for K_s 
         v.clear();
         tmp.clear();    
@@ -266,11 +308,26 @@ void Solver::solve_ramsey(int s, int t){
             //add_constraint(c);
         }
 
+
+        // get combinations for K_t 
+        v.clear();
+        tmp.clear();
+        get_combinations(v,n,t,tmp);
+        for (i=0;i<v.size();i++){
+            c.lhs = v[i];
+            c.sign = '>';
+            c.rhs = 0;
+            if (c.lhs >= min_constraint) add_constraint(c);
+            //add_constraint(c);
+        }
+
         //print_constraint();
 
-        solve(n);
+        //solve(n);
+        solve_using_edges(n);
 
-        std::cout << new_graphs_ptr->size() << std::endl;
+        std::cout << new_graphs_ptr->size();
+        std::cout << " [" << (double(clock() - begin) / CLOCKS_PER_SEC) << "s]" << std::endl;
 
         if (new_graphs_ptr->size()==0) break;
 
@@ -455,7 +512,7 @@ int __popcount(BIGINT x){
 }
 
 
-int Solver::popcount(BIGINT x){
+inline int Solver::popcount(BIGINT x){
 
     /*
     int count = __builtin_popcountll(x);
@@ -467,5 +524,6 @@ int Solver::popcount(BIGINT x){
     for (pop_count=0; x; pop_count++)
         x &= x-1;
     return pop_count;    
+    
     
 }
