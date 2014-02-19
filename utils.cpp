@@ -40,7 +40,8 @@ void y_to_g6(BIGINT y, int n, char* s){
             t<<=1;
 
             // check if last bit is set
-            if (y&1) t|=1;
+            //if (y&1) t|=1;
+            if (mpz_tstbit(y.get_mpz_t(), 0)) t|=1;
 
             y>>=1;
         }
@@ -66,13 +67,15 @@ void y_to_graph(BIGINT y, int n, graph *g){
 
     for (j=1;j<n;j++){
         for (i=0;i<j;i++){
-            if (y&1) ADDONEEDGE(g,i,j,m);
+            //if (y&1) ADDONEEDGE(g,i,j,m);
+            if (mpz_tstbit(y.get_mpz_t(), 0)) ADDONEEDGE(g,i,j,m);
             y>>=1;
         }
     }
 
 }
 
+/*
 BIGINT g6_to_y(char* s){
 
     // get order of graph
@@ -112,6 +115,7 @@ BIGINT g6_to_y(char* s){
     return y;
 
 }
+*/
 
 BIGINT graph_to_y(graph *g, int n){
 
@@ -206,7 +210,8 @@ std::string binary_str(BIGINT n, int bits){
     int current_vertex = 1;
     int count=current_vertex;
     for (int i=0;i<bits;i++){
-        if (n&one) s="1"+s;
+        //if (n&one) s="1"+s;
+        if (mpz_tstbit(n.get_mpz_t(), 0)) s="1"+s;
         else s="0"+s;
 
         count--;

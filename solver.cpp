@@ -214,7 +214,7 @@ void Solver::solve_using_edges(int vertices){
     int shift = (vertices-1)*(vertices-2)/2;
 
     // add edges to each Ramsey graph from previous graph order
-    for (std::set<BIGINT>::iterator it=old_graphs_ptr->begin(); it!=old_graphs_ptr->end(); ++it){
+    for (std::set<BIGINT>::iterator it=old_graphs_ptr->begin(); it != old_graphs_ptr->end(); ++it){
         add_edge(*it, 0, vertices, 0, shift);
     }
 }
@@ -273,8 +273,8 @@ void Solver::solve_ramsey(int s, int t){
     std::vector<BIGINT> v;
 
     // output sugar
-    std::cout << "R(" << s << "," << t << "," << "1) = 1" << std::endl;
-    std::cout << "R(" << s << "," << t << "," << "2) = 2" << std::endl;
+    std::cout << "R(" << s << "," << t << "," << "1) = 1 [0s]" << std::endl;
+    std::cout << "R(" << s << "," << t << "," << "2) = 2 [0s]" << std::endl;
 
     while (n++){
 
@@ -300,10 +300,10 @@ void Solver::solve_ramsey(int s, int t){
         v.clear();
         tmp.clear();    
         get_combinations(v,n,s,tmp);
-        for (i=0;i<v.size();i++){
+        c.sign = '<';
+        c.rhs = s*(s-1)/2;        
+        for (i=0;i<v.size();++i){
             c.lhs = v[i];
-            c.sign = '<';
-            c.rhs = s*(s-1)/2;
             if (c.lhs >= min_constraint) add_constraint(c);
             //add_constraint(c);
         }
@@ -313,10 +313,10 @@ void Solver::solve_ramsey(int s, int t){
         v.clear();
         tmp.clear();
         get_combinations(v,n,t,tmp);
-        for (i=0;i<v.size();i++){
+        c.sign = '>';
+        c.rhs = 0;
+        for (i=0;i<v.size();++i){
             c.lhs = v[i];
-            c.sign = '>';
-            c.rhs = 0;
             if (c.lhs >= min_constraint) add_constraint(c);
             //add_constraint(c);
         }
@@ -499,27 +499,23 @@ const BIGINT k2 = 0x3333333333333333; /*  -1/5   */
 const BIGINT k4 = 0x0f0f0f0f0f0f0f0f; /*  -1/17  */
 const BIGINT kf = 0x0101010101010101; /*  -1/255 */
 
-int _popcount(BIGINT x){
-    //return (int)mpz_popcount(x.get_mpz_t());
+int Solver::popcount(BIGINT x){
+    return (int)mpz_popcount(x.get_mpz_t());
 }
 
+/*
 int __popcount(BIGINT x){
-	x =  x       - ((x >> 1)  & k1); /* put count of each 2 bits into those 2 bits */
-	x = (x & k2) + ((x >> 2)  & k2); /* put count of each 4 bits into those 4 bits */
-	x = (x       +  (x >> 4)) & k4 ; /* put count of each 8 bits into those 8 bits */
-	x = (x * kf) >> 56; /* returns 8 most significant bits of x + (x<<8) + (x<<16) + (x<<24) + ...  */
+	x =  x       - ((x >> 1)  & k1); // put count of each 2 bits into those 2 bits 
+	x = (x & k2) + ((x >> 2)  & k2); // put count of each 4 bits into those 4 bits 
+	x = (x       +  (x >> 4)) & k4 ; // put count of each 8 bits into those 8 bits 
+	x = (x * kf) >> 56; // returns 8 most significant bits of x + (x<<8) + (x<<16) + (x<<24) + ...  
 	return (int) x;
 }
+*/
 
-
+/*
 inline int Solver::popcount(BIGINT x){
 
-    /*
-    int count = __builtin_popcountll(x);
-    x>>=64;
-    count += __builtin_popcountll(x);
-    return count;
-    */
     int pop_count;
     for (pop_count=0; x; pop_count++)
         x &= x-1;
@@ -527,3 +523,4 @@ inline int Solver::popcount(BIGINT x){
     
     
 }
+*/

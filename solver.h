@@ -9,8 +9,8 @@
 #define SOLVER_H
 
 //#define BIGINT unsigned long long
-#define BIGINT __uint128_t
-//#define BIGINT mpz_class
+//#define BIGINT __uint128_t
+#define BIGINT mpz_class
 #define MAX_VERTEX 64
 
 // precision for lhs part, PRECISION x 64 bits
