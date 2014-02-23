@@ -17,7 +17,7 @@
 
 // gcc builtin uint128 for 64-bit processors
 //
-typedef __uint128_t BIGINT;
+//typedef __uint128_t BIGINT;
 
 //
 // unsigned long long
@@ -29,8 +29,8 @@ typedef __uint128_t BIGINT;
 //
 // (Uncomment two lines below to enable gmp)
 //
-//typedef mpz_class BIGINT;
-//#define MPZ_BIGINT 1
+typedef mpz_class BIGINT;
+#define MPZ_BIGINT 1
 
 #define MAX_VERTEX 64
 
