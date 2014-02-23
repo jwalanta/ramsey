@@ -8,9 +8,30 @@
 #ifndef SOLVER_H
 #define SOLVER_H
 
-//#define BIGINT unsigned long long
-#define BIGINT __uint128_t
-//#define BIGINT mpz_class
+
+///
+/// -- IMPORTANT!!! ---
+/// 
+/// Comment or uncomment below to determine data type to use
+/// 
+
+// gcc builtin uint128 for 64-bit processors
+//
+typedef __uint128_t BIGINT;
+
+//
+// unsigned long long
+//
+//typedef unsigned long long BIGINT;
+
+// 
+// GMP Library
+//
+// (Uncomment two lines below to enable gmp)
+//
+//typedef mpz_class BIGINT;
+//#define MPZ_BIGINT 1
+
 #define MAX_VERTEX 64
 
 // precision for lhs part, PRECISION x 64 bits

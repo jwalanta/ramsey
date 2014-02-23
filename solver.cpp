@@ -192,7 +192,6 @@ void Solver::add_edge(BIGINT y, BIGINT edge, int vertices, int edge_start, int s
         // c==2 means it failed for independent set
 
         if (c==1) return;
-        //return;
     }
 
     for (int i=edge_start; i<vertices-1; ++i){
@@ -214,9 +213,11 @@ void Solver::solve_using_edges(int vertices){
     int shift = (vertices-1)*(vertices-2)/2;
 
     // add edges to each Ramsey graph from previous graph order
-    for (std::set<BIGINT>::iterator it=old_graphs_ptr->begin(); it!=old_graphs_ptr->end(); ++it){
+    for (std::set<BIGINT>::iterator it=old_graphs_ptr->begin(); it != old_graphs_ptr->end(); ++it){
         add_edge(*it, 0, vertices, 0, shift);
+        old_graphs_ptr->erase(it);
     }
+
 }
 
 
@@ -273,8 +274,8 @@ void Solver::solve_ramsey(int s, int t){
     std::vector<BIGINT> v;
 
     // output sugar
-    std::cout << "R(" << s << "," << t << "," << "1) = 1" << std::endl;
-    std::cout << "R(" << s << "," << t << "," << "2) = 2" << std::endl;
+    std::cout << "R(" << s << "," << t << "," << "1) = 1 [0s]" << std::endl;
+    std::cout << "R(" << s << "," << t << "," << "2) = 2 [0s]" << std::endl;
 
     while (n++){
 
@@ -300,10 +301,10 @@ void Solver::solve_ramsey(int s, int t){
         v.clear();
         tmp.clear();    
         get_combinations(v,n,s,tmp);
-        for (i=0;i<v.size();i++){
+        c.sign = '<';
+        c.rhs = s*(s-1)/2;        
+        for (i=0;i<v.size();++i){
             c.lhs = v[i];
-            c.sign = '<';
-            c.rhs = s*(s-1)/2;
             if (c.lhs >= min_constraint) add_constraint(c);
             //add_constraint(c);
         }
@@ -313,10 +314,10 @@ void Solver::solve_ramsey(int s, int t){
         v.clear();
         tmp.clear();
         get_combinations(v,n,t,tmp);
-        for (i=0;i<v.size();i++){
+        c.sign = '>';
+        c.rhs = 0;
+        for (i=0;i<v.size();++i){
             c.lhs = v[i];
-            c.sign = '>';
-            c.rhs = 0;
             if (c.lhs >= min_constraint) add_constraint(c);
             //add_constraint(c);
         }
@@ -329,7 +330,11 @@ void Solver::solve_ramsey(int s, int t){
         std::cout << new_graphs_ptr->size();
         std::cout << " [" << (double(clock() - begin) / CLOCKS_PER_SEC) << "s]" << std::endl;
 
-        if (new_graphs_ptr->size()==0) break;
+        if (new_graphs_ptr->size()==0) {
+            // no ramsey graphs found
+            // current n is the Ramsey Number
+            break;
+        }
 
         // point old graphs to new graphs for next iteration
         std::set<BIGINT> *tmp_graphs;
@@ -338,7 +343,8 @@ void Solver::solve_ramsey(int s, int t){
         new_graphs_ptr = tmp_graphs;
 
         // clear new graphs (previously old graph)
-        new_graphs_ptr->clear();
+        // EDIT: no need to clear, this set is already emptied
+        // new_graphs_ptr->clear();
 
     }
 
@@ -493,37 +499,33 @@ int Solver::popcount(BIGINT n){
 }
 */
 
-
-const BIGINT  k1 = 0x5555555555555555; /*  -1/3   */
-const BIGINT k2 = 0x3333333333333333; /*  -1/5   */
-const BIGINT k4 = 0x0f0f0f0f0f0f0f0f; /*  -1/17  */
-const BIGINT kf = 0x0101010101010101; /*  -1/255 */
-
-int _popcount(BIGINT x){
-    //return (int)mpz_popcount(x.get_mpz_t());
-}
-
-int __popcount(BIGINT x){
-	x =  x       - ((x >> 1)  & k1); /* put count of each 2 bits into those 2 bits */
-	x = (x & k2) + ((x >> 2)  & k2); /* put count of each 4 bits into those 4 bits */
-	x = (x       +  (x >> 4)) & k4 ; /* put count of each 8 bits into those 8 bits */
-	x = (x * kf) >> 56; /* returns 8 most significant bits of x + (x<<8) + (x<<16) + (x<<24) + ...  */
-	return (int) x;
-}
-
+#ifndef MPZ_BIGINT
 
 inline int Solver::popcount(BIGINT x){
 
-    /*
-    int count = __builtin_popcountll(x);
-    x>>=64;
-    count += __builtin_popcountll(x);
-    return count;
-    */
     int pop_count;
     for (pop_count=0; x; pop_count++)
         x &= x-1;
     return pop_count;    
     
-    
 }
+
+#else
+
+inline int Solver::popcount(BIGINT x){
+    return (int)mpz_popcount(x.get_mpz_t());
+}
+
+#endif
+
+
+/*
+int __popcount(BIGINT x){
+	x =  x       - ((x >> 1)  & k1); // put count of each 2 bits into those 2 bits 
+	x = (x & k2) + ((x >> 2)  & k2); // put count of each 4 bits into those 4 bits 
+	x = (x       +  (x >> 4)) & k4 ; // put count of each 8 bits into those 8 bits 
+	x = (x * kf) >> 56; // returns 8 most significant bits of x + (x<<8) + (x<<16) + (x<<24) + ...  
+	return (int) x;
+}
+*/
+
