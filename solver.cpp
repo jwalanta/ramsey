@@ -192,7 +192,6 @@ void Solver::add_edge(BIGINT y, BIGINT edge, int vertices, int edge_start, int s
         // c==2 means it failed for independent set
 
         if (c==1) return;
-        //return;
     }
 
     for (int i=edge_start; i<vertices-1; ++i){
@@ -216,7 +215,9 @@ void Solver::solve_using_edges(int vertices){
     // add edges to each Ramsey graph from previous graph order
     for (std::set<BIGINT>::iterator it=old_graphs_ptr->begin(); it != old_graphs_ptr->end(); ++it){
         add_edge(*it, 0, vertices, 0, shift);
+        old_graphs_ptr->erase(it);
     }
+
 }
 
 
@@ -329,7 +330,11 @@ void Solver::solve_ramsey(int s, int t){
         std::cout << new_graphs_ptr->size();
         std::cout << " [" << (double(clock() - begin) / CLOCKS_PER_SEC) << "s]" << std::endl;
 
-        if (new_graphs_ptr->size()==0) break;
+        if (new_graphs_ptr->size()==0) {
+            // no ramsey graphs found
+            // current n is the Ramsey Number
+            break;
+        }
 
         // point old graphs to new graphs for next iteration
         std::set<BIGINT> *tmp_graphs;
@@ -338,7 +343,8 @@ void Solver::solve_ramsey(int s, int t){
         new_graphs_ptr = tmp_graphs;
 
         // clear new graphs (previously old graph)
-        new_graphs_ptr->clear();
+        // EDIT: no need to clear, this set is already emptied
+        // new_graphs_ptr->clear();
 
     }
 
@@ -493,15 +499,25 @@ int Solver::popcount(BIGINT n){
 }
 */
 
+#ifndef MPZ_BIGINT
 
-const BIGINT  k1 = 0x5555555555555555; /*  -1/3   */
-const BIGINT k2 = 0x3333333333333333; /*  -1/5   */
-const BIGINT k4 = 0x0f0f0f0f0f0f0f0f; /*  -1/17  */
-const BIGINT kf = 0x0101010101010101; /*  -1/255 */
+inline int Solver::popcount(BIGINT x){
 
-int Solver::popcount(BIGINT x){
+    int pop_count;
+    for (pop_count=0; x; pop_count++)
+        x &= x-1;
+    return pop_count;    
+    
+}
+
+#else
+
+inline int Solver::popcount(BIGINT x){
     return (int)mpz_popcount(x.get_mpz_t());
 }
+
+#endif
+
 
 /*
 int __popcount(BIGINT x){
@@ -513,14 +529,3 @@ int __popcount(BIGINT x){
 }
 */
 
-/*
-inline int Solver::popcount(BIGINT x){
-
-    int pop_count;
-    for (pop_count=0; x; pop_count++)
-        x &= x-1;
-    return pop_count;    
-    
-    
-}
-*/
