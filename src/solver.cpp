@@ -19,9 +19,30 @@ Solver::Solver(){
     new_graphs_ptr = &new_graphs;
     old_graphs_ptr = &old_graphs;
 
+    // get MPI information
+    
+    // Get the number of processes
+    MPI_Comm_size(MPI_COMM_WORLD, &mpi_num_processes); 
+
+    // Get my rank among all the processes
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_this_process);     
+
+    // parallel partition not started
+    mpi_parallel_start = 0;
+
 }
 
 Solver::~Solver(){
+
+    int a = 0;
+
+    // block till all processes are done
+    if (mpi_this_process==0){
+        MPI_Bcast(&a, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    }
+    else{
+        MPI_Bcast(&a, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    }
 
 }
 
@@ -212,10 +233,39 @@ void Solver::solve_using_edges(int vertices){
     // shift count for new edges
     int shift = (vertices-1)*(vertices-2)/2;
 
-    // add edges to each Ramsey graph from previous graph order
-    for (std::set<BIGINT>::iterator it=old_graphs_ptr->begin(); it != old_graphs_ptr->end(); ++it){
-        add_edge(*it, 0, vertices, 0, shift);
-        old_graphs_ptr->erase(it);
+    // partition the graphs for parallel execution
+    // start parallel after hitting 100 thousand graphs
+    if (!mpi_parallel_start && old_graphs_ptr->size() > 100000){
+
+        float partition_size = old_graphs_ptr->size() / mpi_num_processes;
+
+        int st = (int)(mpi_this_process * partition_size);
+        int en = (int)(mpi_this_process * partition_size + partition_size);
+
+        int count = -1;
+
+        // add edges to each Ramsey graph from previous graph order
+        for (std::set<BIGINT>::iterator it=old_graphs_ptr->begin(); it != old_graphs_ptr->end(); ++it){
+
+            count++;
+
+            // skip anything not in range
+            if (count < st || count >= en) continue;
+
+            add_edge(*it, 0, vertices, 0, shift);
+            old_graphs_ptr->erase(it);
+        }
+
+        // parallel started, dont partition anymore
+        mpi_parallel_start = 1;
+
+    }
+    else{
+        // add edges to each Ramsey graph from previous graph order
+        for (std::set<BIGINT>::iterator it=old_graphs_ptr->begin(); it != old_graphs_ptr->end(); ++it){
+            add_edge(*it, 0, vertices, 0, shift);
+            old_graphs_ptr->erase(it);
+        }
     }
 
 }
@@ -274,12 +324,12 @@ void Solver::solve_ramsey(int s, int t){
     std::vector<BIGINT> v;
 
     // output sugar
-    std::cout << "R(" << s << "," << t << "," << "1) = 1 [0s]" << std::endl;
-    std::cout << "R(" << s << "," << t << "," << "2) = 2 [0s]" << std::endl;
+    std::cout << "# " << mpi_this_process << ": R(" << s << "," << t << "," << "1) = 1 [0s]" << std::endl;
+    std::cout << "# " << mpi_this_process << ": R(" << s << "," << t << "," << "2) = 2 [0s]" << std::endl;
 
     while (n++){
 
-        std::cout << "R(" << s << "," << t << "," << n << ") = " << std::flush;
+        //std::cout << "# " << mpi_this_process << ": R(" << s << "," << t << "," << n << ") = " << std::flush;
 
         // calculate edges
         int e=n*(n-1)/2, i;
@@ -327,8 +377,8 @@ void Solver::solve_ramsey(int s, int t){
         //solve(n);
         solve_using_edges(n);
 
-        std::cout << new_graphs_ptr->size();
-        std::cout << " [" << (double(clock() - begin) / CLOCKS_PER_SEC) << "s]" << std::endl;
+        std::cout << "# " << mpi_this_process << ": R(" << s << "," << t << "," << n << ") = " 
+                  << new_graphs_ptr->size() << " [" << (double(clock() - begin) / CLOCKS_PER_SEC) << "s]" << std::endl;
 
         if (new_graphs_ptr->size()==0) {
             // no ramsey graphs found

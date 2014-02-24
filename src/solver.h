@@ -2,8 +2,9 @@
 #include <fstream>
 #include <vector>
 #include <set>
-#include <gmpxx.h>
 #include <ctime>
+#include <gmpxx.h>
+#include <mpi.h>
 
 #ifndef SOLVER_H
 #define SOLVER_H
@@ -55,6 +56,11 @@ class Solver{
         std::set<BIGINT> old_graphs, new_graphs, *old_graphs_ptr, *new_graphs_ptr;
         int order;
         clock_t begin;
+
+        int mpi_num_processes;
+        int mpi_this_process;
+
+        int mpi_parallel_start;
 
     public:
         Solver();
