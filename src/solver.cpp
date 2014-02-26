@@ -34,16 +34,6 @@ Solver::Solver(){
 
 Solver::~Solver(){
 
-    int a = 0;
-
-    // block till all processes are done
-    if (mpi_this_process==0){
-        MPI_Bcast(&a, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    }
-    else{
-        MPI_Bcast(&a, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    }
-
 }
 
 void Solver::add_constraint(Constraint c){
@@ -398,7 +388,22 @@ void Solver::solve_ramsey(int s, int t){
 
     }
 
+    // wait till all processes are done
+    mpi_wait();
 
+
+}
+
+void Solver::mpi_wait(){
+    int a = 0;
+
+    // block till all processes are done
+    if (mpi_this_process==0){
+        MPI_Bcast(&a, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    }
+    else{
+        MPI_Bcast(&a, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    }
 }
 
 /*

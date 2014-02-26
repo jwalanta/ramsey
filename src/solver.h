@@ -80,6 +80,8 @@ class Solver{
 
         void add_edge(BIGINT y, BIGINT edge, int vertices, int edge_start, int shift);
         void solve_using_edges(int vertices);
+
+        void mpi_wait();
 };
 
 #endif
