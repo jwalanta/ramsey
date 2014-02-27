@@ -33,6 +33,9 @@ int main(int argc, char* argv[]){
 		return 1;
 	}
 
+	// Initialize MPI
+	MPI_Init(&argc, &argv);
+
 	int s = atoi(argv[1]);
 	int t = atoi(argv[2]);
 	//int n = atoi(argv[3]);
@@ -56,6 +59,9 @@ int main(int argc, char* argv[]){
 
 	Solver so;
 	so.solve_ramsey(s,t);
+
+	// shut down MPI
+	MPI_Finalize(); 
 
 	return 0;
 }

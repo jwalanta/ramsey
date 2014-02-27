@@ -2,8 +2,9 @@
 #include <fstream>
 #include <vector>
 #include <set>
-#include <gmpxx.h>
 #include <ctime>
+#include <gmpxx.h>
+#include <mpi.h>
 
 #ifndef SOLVER_H
 #define SOLVER_H
@@ -56,6 +57,11 @@ class Solver{
         int order;
         clock_t begin;
 
+        int mpi_num_processes;
+        int mpi_this_process;
+
+        int mpi_parallel_start;
+
     public:
         Solver();
         ~Solver();
@@ -74,6 +80,10 @@ class Solver{
 
         void add_edge(BIGINT y, BIGINT edge, int vertices, int edge_start, int shift);
         void solve_using_edges(int vertices);
+
+        void write_to_file_g6(std::set<BIGINT> *graphs, int vertices, const char* filename);
+
+        void mpi_wait();
 };
 
 #endif
