@@ -4,6 +4,7 @@
 #include <bitset>
 #include <algorithm>
 #include <string.h>
+#include <stdlib.h>
 #include "solver.h"
 #include "utils.h"
 
@@ -310,6 +311,9 @@ void Solver::solve_ramsey(int s, int t){
     // graph order
     int n=2, total;
 
+    // filename
+    char filename[100];
+
     // vector to store edges of complete graph
     std::vector<BIGINT> v;
 
@@ -385,6 +389,15 @@ void Solver::solve_ramsey(int s, int t){
         // clear new graphs (previously old graph)
         // EDIT: no need to clear, this set is already emptied
         // new_graphs_ptr->clear();
+        
+
+        // write graphs to file
+        if (mpi_num_processes > 1)
+            sprintf(filename, "/tmp/r_%d_%d_%d_%d.g6",  s, t, n, mpi_this_process);
+        else
+            sprintf(filename, "/tmp/r_%d_%d_%d.g6",  s, t, n);
+
+        write_to_file_g6(old_graphs_ptr, n, filename);
 
     }
 
@@ -584,3 +597,28 @@ int __popcount(BIGINT x){
 }
 */
 
+
+
+void Solver::write_to_file_g6(std::set<BIGINT> *graphs_ptr, int vertices, const char* filename){
+
+    char graph_g6_str[2048];
+    char command[100];
+
+    // open file for writing
+    std::ofstream g6_file;
+    g6_file.open(filename);
+
+    std::cout << "Writing " << graphs_ptr->size() << " graphs." << std::endl;
+
+    for (std::set<BIGINT>::iterator it=graphs_ptr->begin(); it != graphs_ptr->end(); ++it){
+        y_to_g6(*it, vertices, graph_g6_str);
+        g6_file << graph_g6_str;
+    }
+
+    g6_file.close();
+
+    // sort the file
+    sprintf(command, "LC_COLLATE=C sort -o '%s' '%s'", filename, filename);
+    int r = system(command);
+
+}

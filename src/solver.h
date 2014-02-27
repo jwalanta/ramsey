@@ -81,6 +81,8 @@ class Solver{
         void add_edge(BIGINT y, BIGINT edge, int vertices, int edge_start, int shift);
         void solve_using_edges(int vertices);
 
+        void write_to_file_g6(std::set<BIGINT> *graphs, int vertices, const char* filename);
+
         void mpi_wait();
 };
 
