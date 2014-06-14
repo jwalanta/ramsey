@@ -1,42 +1,15 @@
 #include <iostream>
-#include <fstream>
 #include <vector>
 #include <set>
 #include <ctime>
+#include <stdio.h>
 #include <gmpxx.h>
 #include <mpi.h>
+#include "bigint.h"
+#include "graphfile.h"
 
 #ifndef SOLVER_H
 #define SOLVER_H
-
-
-///
-/// -- IMPORTANT!!! ---
-/// 
-/// Comment or uncomment below to determine data type to use
-/// 
-
-// gcc builtin uint128 for 64-bit processors
-//
-//typedef __uint128_t BIGINT;
-
-//
-// unsigned long long
-//
-//typedef unsigned long long BIGINT;
-
-// 
-// GMP Library
-//
-// (Uncomment two lines below to enable gmp)
-//
-typedef mpz_class BIGINT;
-#define MPZ_BIGINT 1
-
-#define MAX_VERTEX 64
-
-// precision for lhs part, PRECISION x 64 bits
-#define PRECISION 1
 
 extern int m2a_map[MAX_VERTEX][MAX_VERTEX];
 
@@ -46,44 +19,52 @@ struct Constraint{
     int rhs;
 
     // for updating y
-    BIGINT a;
-    BIGINT b;
+    //BIGINT a;
+    //BIGINT b;
 };
 
 class Solver{
 
+        // constraints
         std::vector<Constraint> constraint;
-        std::set<BIGINT> old_graphs, new_graphs, *old_graphs_ptr, *new_graphs_ptr;
-        int order;
-        clock_t begin;
 
-        int mpi_num_processes;
+        // computed new graphs
+        std::set<BIGINT> graphs;
+
+        // input graph file
+        GraphFile* input_graphs;
+
+        // mpi variables
+        int mpi_total_processes;
         int mpi_this_process;
 
-        int mpi_parallel_start;
+        // current working folder
+        char folder[255];
+        char current_file_prefix[255];
+
+        // output graph file count
+        int output_graphfile_count;
+        int output_graphs_count;
 
     public:
-        Solver();
+        Solver(const char *folder);
         ~Solver();
 
-        void add_constraint(Constraint c);
-        void clear_constraints();
-        void print_constraint();
-
-        void solve(int vertices);
+        // constraints
+        void constraints_create(int s, int t, int n);
+        void constraints_clear();
+        void constraints_print();
+        void constraint_add(Constraint c);
         int check(BIGINT n);
 
-        int popcount(BIGINT n);
-        std::string get_g6(BIGINT n, int m);
-
+        // solve ramsey
         void solve_ramsey(int s, int t);
-
-        void add_edge(BIGINT y, BIGINT edge, int vertices, int edge_start, int shift);
         void solve_using_edges(int vertices);
+        void add_edge(BIGINT y, BIGINT edge, int vertices, int edge_start, int shift);
 
-        void write_to_file_g6(std::set<BIGINT> *graphs, int vertices, const char* filename);
+        // popcount
+        int popcount(BIGINT x);
 
-        void mpi_wait();
 };
 
 #endif

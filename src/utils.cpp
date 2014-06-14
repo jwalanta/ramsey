@@ -1,8 +1,7 @@
-#include <iostream>
 #include <vector>
-#include "solver.h"
-
-#define MAXN 64
+#include <set>
+#include <stdio.h>
+#include "utils.h"
 #include "nauty.h"
 #include "gtools.h"
 
@@ -127,6 +126,16 @@ BIGINT g6_to_y(char* s){
 }
 */
 
+BIGINT g6_to_y(char* s, int n){
+
+    int m = (n + WORDSIZE - 1) / WORDSIZE;
+    
+    stringtograph(s, g, m);
+
+    return graph_to_y(g, n);
+}
+
+
 BIGINT graph_to_y(graph *g, int n){
 
     int i,j, count=0;
@@ -172,7 +181,7 @@ BIGINT canon_label(BIGINT y, int nv){
 
 }
 
-void get_combinations(std::vector<BIGINT>& v, int n, int r, std::vector<int>& c, int st=-1){
+void get_combinations(std::vector<BIGINT>& v, int n, int r, std::vector<int>& c, int st){
 
     if (r==0){
 
@@ -183,10 +192,10 @@ void get_combinations(std::vector<BIGINT>& v, int n, int r, std::vector<int>& c,
 
         /*
         for (x=0;x<c.size();x++){
-            cout << c[x] << " ";
+            printf("%d ",c[x]);
 
         }
-        cout << endl;
+        printf("\n");
         */
         
         // find all edges in c and create edge number
@@ -241,5 +250,44 @@ std::string binary_str(BIGINT n, int bits){
     }
 
     return s;
+
+}
+
+bool file_exists(const char* filename){
+    FILE* fp = NULL;
+
+    fp = fopen(filename, "r");
+
+    if(fp != NULL){
+        fclose(fp);
+        return true;
+    }
+
+    return false;
+}
+
+
+void write_to_file_g6(std::set<BIGINT> *graphs_ptr, int vertices, const char* filename){
+
+    char graph_g6_str[2048];
+    char command[100];
+
+    // open file for writing
+    FILE *fp;
+
+    fp = fopen(filename, "w+");
+
+    //std::cout << "Writing " << graphs_ptr->size() << " graphs." << std::endl;
+
+    for (std::set<BIGINT>::iterator it=graphs_ptr->begin(); it != graphs_ptr->end(); ++it){
+        y_to_g6(*it, vertices, graph_g6_str);
+        fputs(graph_g6_str, fp);
+    }
+
+    fclose(fp);
+
+    // sort the file
+    sprintf(command, "LC_ALL=C sort -o '%s' '%s'", filename, filename);
+    int r = system(command);
 
 }

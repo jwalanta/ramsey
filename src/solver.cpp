@@ -1,183 +1,316 @@
 #include <iostream>
-#include <fstream>
 #include <vector>
 #include <bitset>
 #include <algorithm>
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <glob.h>
+#include "bigint.h"
 #include "solver.h"
 #include "utils.h"
 
-/*
-int constraint_sort(Constraint a, Constraint b){
-	if (a.sign=='>' && b.sign=='<') return true;
-	return (ffsll(a.lhs)>ffsll(b.lhs));
-}
-*/
+Solver::Solver(const char *folder){
 
-Solver::Solver(){
+    // save folder
+    strcpy(this->folder, folder);
 
-    new_graphs_ptr = &new_graphs;
-    old_graphs_ptr = &old_graphs;
+    // initialize input graphfiles
+    input_graphs = new GraphFile(folder);
 
     // get MPI information
-    
     // Get the number of processes
-    MPI_Comm_size(MPI_COMM_WORLD, &mpi_num_processes); 
+    MPI_Comm_size(MPI_COMM_WORLD, &mpi_total_processes); 
 
     // Get my rank among all the processes
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_this_process);     
-
-    // parallel partition not started
-    mpi_parallel_start = 0;
-
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_this_process);      
 }
 
 Solver::~Solver(){
 
 }
 
-void Solver::add_constraint(Constraint c){
+void Solver::constraints_create(int s, int t, int n){
 
-	// compute a and b
-	
-	// first bit set to 1
-	// http://linux.die.net/man/3/ffs
-	/*
-    int n = ffsll(c.lhs);
+    // vector to store edges of complete graph
+    std::vector<BIGINT> v;    
 
-	if (n>0){
-		n--;
+    // calculate edges
+    int e=n*(n-1)/2, i;
 
-		// set a to 0-bit for upto the first set bit in lhs
-		c.a = 0;	// set all to 0
-		c.a = ~c.a;		// set all to 1
-		c.a <<= n;	// shift n bits left
+    Constraint c;
+    std::vector<int> tmp;    
 
-		// set b to 1-bit at first set bit in lhs
-		c.b = 1ULL<<n;
-	}
-    */
-    constraint.push_back(c);
+    // computing minimum size of constraint
+    int shift = (n-1)*(n-2)/2;
+
+    // remove all unnecessary constraints
+    BIGINT min_constraint = 1;
+    min_constraint<<=shift;
+
+    // get combinations for K_s 
+    v.clear();
+    tmp.clear();    
+    get_combinations(v,n,s,tmp,-1);
+    c.sign = '<';
+    c.rhs = s*(s-1)/2;        
+    for (i=0;i<v.size();++i){
+        c.lhs = v[i];
+        if (c.lhs >= min_constraint) constraint_add(c);
+        //constraint_add(c);
+    }
+
+
+    // get combinations for K_t 
+    v.clear();
+    tmp.clear();
+    get_combinations(v,n,t,tmp,-1);
+    c.sign = '>';
+    c.rhs = 0;
+    for (i=0;i<v.size();++i){
+        c.lhs = v[i];
+        if (c.lhs >= min_constraint) constraint_add(c);
+        //constraint_add(c);
+    }    
 
 }
 
-void Solver::clear_constraints(){
+void Solver::constraint_add(Constraint c){
+    constraint.push_back(c);
+}
+
+void Solver::constraints_clear(){
     constraint.clear();
 }
 
-void Solver::print_constraint(){
-
+void Solver::constraints_print(){
     int l_count = 0, g_count = 0;
     std::cout << std::endl;
 
-	for (int i=0;i<constraint.size();i++){
-		//std::bitset<64> x(constraint[i].lhs);
-		std::cout << "[" << binary_str(constraint[i].lhs,64) << "]" << constraint[i].sign << constraint[i].rhs << std::endl;
+    for (int i=0;i<constraint.size();i++){
+        //std::bitset<64> x(constraint[i].lhs);
+        std::cout << "[" << binary_str(constraint[i].lhs,64) << "]" << constraint[i].sign << constraint[i].rhs << std::endl;
 
         if (constraint[i].sign=='<') l_count++; else g_count++;
     }
 
     std::cout << "<: " << l_count << " >: " << g_count << std::endl;
-
 }
 
-/*
-int Solver::solve(int vertices, string filename=""){
+int Solver::check(BIGINT n){
 
-	int i, count=0;
-	int satisfy;
+    BIGINT t;
 
-	BIGINT t,max,n,on,jumps=0;
+    // check n against all constraints
+    for (int i=0;i<constraint.size();++i){
 
-	//sort(constraint.begin(), constraint.end(), constraint_sort);
-	//print_constraint();
-	
-	// size of graph
-	int m=vertices*(vertices-1)/2;
+        t = constraint[i].lhs & n;
 
-	max = 1ULL<<m;
-
-	//cout << "m: " << m << "max: " << max << endl;
-
-	ofstream ofile;
-	if (filename!=""){
-		ofile.open(filename.c_str());
-	}
-
-	//#pragma omp parallel for shared(count)
-	for (n=0;n<max;n++){
-
-		if (check(n)) {
-
-			//#pragma omp atomic
-			count++;
-
-			if (filename != ""){
-				ofile << get_g6(n, vertices) << endl;
-			}
-
-		}
-        else{
-            // jump
-
-
+        if (constraint[i].sign == '<'){
+            if (popcount(t) >= constraint[i].rhs){
+                // doesnt satisfy
+                return 1;
+            }
+        }
+        
+        if (constraint[i].sign == '>'){
+            if (popcount(t) <= constraint[i].rhs){
+                // doesnt satisfy
+                return 2;
+            }
         }
 
-	}
+    }
 
-	if (filename!=""){
-		ofile.close();
-	}	
-
-	//cout << "Jumps: " << jumps << endl;
-
-	return count++;
+    return 0;
 
 }
-*/
 
-void Solver::solve(int vertices){
 
-    BIGINT one=1,n,i;
-    int shift;
+void Solver::solve_ramsey(int s, int t){
 
-    int max;
+    int n=2, total, total_tmp, i;
+    clock_t start_time;
 
-    max = 1<<(vertices-1);
+    // for gathering and merging files
+    char pattern[255], command[255];
+    glob_t globbuf;
 
-    //std::cout << "Max: " << max << std::endl;
+    // note starting clock
+    start_time = clock();
 
-    //std::cout << constraint.size() << " constraints, ";
+    // clear graphs vector
+    graphs.clear();
 
-    shift = (vertices-1)*(vertices-2)/2;
+    // initialize seed graph files
+    if (mpi_this_process == 0){
+        input_graphs->create_seed_graph_files(s, t);
+        
+        printf("R(%d,%d,1) = 1 [0s]\n", s, t);
+        printf("R(%d,%d,2) = 2 [0s]\n", s, t);
 
-    // loop through all old constraints
-    int count=0;
-    for (std::set<BIGINT>::iterator it=old_graphs_ptr->begin(); it!=old_graphs_ptr->end(); ++it){
-        for (i=0;i<max;++i){
+    }
 
-            // create n using old graph and new edge
-            n=i;
-            n<<=shift;
-            n|=*it;
+    // sync all processes at this point
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    while (n++){
+
+        // set current file prefix
+        sprintf(current_file_prefix, "%sr_%d_%d_%d", folder, s, t, n);        
+
+        // check if the file already exists
+        sprintf(command, "%s.g6", current_file_prefix);
+        if (file_exists(command)){
+
+            if (mpi_this_process == 0){
+                printf("R(%d,%d,%d) = skip [%ds]\n", s, t, n, 
+                    (int)(double(clock() - start_time) / CLOCKS_PER_SEC));
+            }
+
+            continue;
+        }
+
+        // clear constraints
+        constraints_clear();
+
+        // create constraints
+        constraints_create(s, t, n);
+
+        //constraints_print();
+
+        // initialize input graph files
+        input_graphs->init(s, t, n-1);
+
+        // reset output graph file count
+        output_graphfile_count = 0;
+        output_graphs_count = 0;
+
+        // find ramsey graphs
+        solve_using_edges(n);
+
+        // total graphs computed in this process
+        total = output_graphs_count;
+
+        // wait up for all processes to finish up
+        if (mpi_this_process == 0){
+
+            // sum up all totals from other processes
+            for (i=1;i<mpi_total_processes;i++){
+                MPI_Recv(&total_tmp, 1, MPI_INT, MPI_ANY_SOURCE, 0, 
+                    MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+                total += total_tmp;
+            }
+
+            printf("R(%d,%d,%d) = %d [%ds]\n", s, t, n, total, 
+                (int)(double(clock() - start_time) / CLOCKS_PER_SEC));
+
+        }
+        else{
+            // send total to process 0
+            MPI_Send(&total, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
+        }
+
+        // gather all files, sort and merge
+        if (mpi_this_process == 0){
+
+            int found = 0;
+
+            if (total==0) {
+                // no ramsey graphs found
+                // current n is the Ramsey Number
+
+                // stop rest of the processes
+                found = 1;
+                for (i=1;i<mpi_total_processes;i++){
+                    MPI_Send(&found, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+                }
+
+                // delete files
+                sprintf(command, "rm %s*.g6", current_file_prefix);
+                int sc = system(command);                
+
+                // stop
+                break;
+            }            
+
+            // glob over all files that have been generated
 
             /*
-            if (vertices == 9 || vertices == 10){
-                std::cout  << "Old graph: " << binary_str(*it, 64) 
-                            << ", Edge: " << binary_str(i, 16)
-                            << ", New graph: " << binary_str(n, 64) 
-                            << std::endl;
-            }
-            */             
+            sprintf(pattern, "%sr_%d_%d*.g6", folder, s, t);
 
-            if (check(n)==0){
-                new_graphs_ptr->insert(canon_label(n,vertices));
-                //new_graphs_ptr->insert(n);
+            glob(pattern, GLOB_TILDE, NULL, &globbuf);
+
+            // sort all files individually
+            for (i=0;i < globbuf.gl_pathc; ++i){
+
+                sprintf(command, "LC_ALL=C sort -o '%s' '%s'", 
+                    globbuf.gl_pathv[i], globbuf.gl_pathv[i]);
+                int r = system(command);
             }
+
+            if( globbuf.gl_pathc > 0 ) globfree( &globbuf );
+            */
+
+            // merge files (they are already sorted)
+            sprintf(command, "LC_ALL=C sort -mu -o %s.g6 %s*.g6", 
+                current_file_prefix, current_file_prefix);
+
+            int sc = system(command);
+
+            // delete individual files
+            sprintf(command, "rm %s_*.g6", current_file_prefix);
+            sc = system(command);
+
+            // send msg to other processes to continue
+            for (i=1;i<mpi_total_processes;i++){
+                MPI_Send(&found, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+            }            
+
+        }
+        else{
+            int found;
+            MPI_Recv(&found, 1, MPI_INT, 0, 0, 
+                MPI_COMM_WORLD, MPI_STATUS_IGNORE);            
+
+            // check if process 0 wants to continue for next n
+            if (found) break;
 
         }
     }
+
+
+}
+
+void Solver::solve_using_edges(int vertices){
+
+    // shift count for new edges
+    int shift = (vertices-1)*(vertices-2)/2;
+
+    // set initial pointer according to mpi_this_process
+    long double graphs_per_process = input_graphs->get_total_graphs() / 
+        (long double)mpi_total_processes;
+
+    input_graphs->seek_to( (unsigned long long)(graphs_per_process * mpi_this_process) );
+
+    unsigned long long total_graphs_to_process = (unsigned long long)(graphs_per_process * (mpi_this_process+1)) 
+        - (unsigned long long)(graphs_per_process * mpi_this_process);
+
+    // iterate over all previous graphs
+    while (total_graphs_to_process--){
+        add_edge(input_graphs->get_y(), 0, vertices, 0, shift);    
+    }
+
+    // write graph file
+    char filename[255];
+    sprintf(filename, "%s_%d_%d.g6", 
+        current_file_prefix, mpi_this_process, output_graphfile_count);
+    write_to_file_g6(&graphs, vertices, filename);
+
+    output_graphs_count += graphs.size();
+    graphs.clear();
+
 }
 
 void Solver::add_edge(BIGINT y, BIGINT edge, int vertices, int edge_start, int shift){
@@ -194,7 +327,22 @@ void Solver::add_edge(BIGINT y, BIGINT edge, int vertices, int edge_start, int s
     int c = check(n);
     if (c==0){
         // ramsey graph
-        new_graphs_ptr->insert(canon_label(n,vertices));
+
+        try{
+            graphs.insert(canon_label(n,vertices));
+        }
+        catch(const std::bad_alloc& e){
+            // out of memory,
+            // write graph file
+            char filename[255];
+            sprintf(filename, "%s_%d_%d.g6", 
+                current_file_prefix, mpi_this_process, output_graphfile_count++);
+            write_to_file_g6(&graphs, vertices, filename);
+
+            // clear graphs vector
+            output_graphs_count += graphs.size();
+            graphs.clear();
+        }
     }
     else{
         // since this is not a ramsey graph
@@ -218,355 +366,6 @@ void Solver::add_edge(BIGINT y, BIGINT edge, int vertices, int edge_start, int s
 
 }
 
-
-void Solver::solve_using_edges(int vertices){
-
-    // shift count for new edges
-    int shift = (vertices-1)*(vertices-2)/2;
-
-    // partition the graphs for parallel execution
-    // start parallel after hitting 100 thousand graphs
-    if (!mpi_parallel_start && old_graphs_ptr->size() > 100000){
-
-        float partition_size = old_graphs_ptr->size() / mpi_num_processes;
-
-        int st = (int)(mpi_this_process * partition_size);
-        int en = (int)(mpi_this_process * partition_size + partition_size);
-
-        int count = -1;
-
-        // add edges to each Ramsey graph from previous graph order
-        for (std::set<BIGINT>::iterator it=old_graphs_ptr->begin(); it != old_graphs_ptr->end(); ++it){
-
-            count++;
-
-            // skip anything not in range
-            if (count < st || count >= en) continue;
-
-            add_edge(*it, 0, vertices, 0, shift);
-            old_graphs_ptr->erase(it);
-        }
-
-        // parallel started, dont partition anymore
-        mpi_parallel_start = 1;
-
-    }
-    else{
-        // add edges to each Ramsey graph from previous graph order
-        for (std::set<BIGINT>::iterator it=old_graphs_ptr->begin(); it != old_graphs_ptr->end(); ++it){
-            add_edge(*it, 0, vertices, 0, shift);
-            old_graphs_ptr->erase(it);
-        }
-    }
-
-}
-
-
-int Solver::check(BIGINT n){
-
-	BIGINT t;
-
-	// check n against all constraints
-	for (int i=0;i<constraint.size();++i){
-
-		t = constraint[i].lhs & n;
-
-		if (constraint[i].sign == '<'){
-			if (popcount(t) >= constraint[i].rhs){
-				// doesnt satisfy
-				return 1;
-			}
-		}
-		
-		if (constraint[i].sign == '>'){
-			if (popcount(t) <= constraint[i].rhs){
-				// doesnt satisfy
-				return 2;
-			}
-		}
-
-	}
-
-	return 0;
-
-
-}
-
-void Solver::solve_ramsey(int s, int t){
-
-    // start clock
-    begin = clock();
-
-    // ramsey graphs upto n<=2 are same
-
-    // create graphs for n=2
-
-    old_graphs_ptr->clear();
-    new_graphs_ptr->clear();
-
-    // two graphs for n=2
-    old_graphs_ptr->insert(0);
-    old_graphs_ptr->insert(1);
-
-    // graph order
-    int n=2, total;
-
-    // filename
-    char filename[100];
-
-    // vector to store edges of complete graph
-    std::vector<BIGINT> v;
-
-    // output sugar
-    std::cout << "# " << mpi_this_process << ": R(" << s << "," << t << "," << "1) = 1 [0s]" << std::endl;
-    std::cout << "# " << mpi_this_process << ": R(" << s << "," << t << "," << "2) = 2 [0s]" << std::endl;
-
-    while (n++){
-
-        //std::cout << "# " << mpi_this_process << ": R(" << s << "," << t << "," << n << ") = " << std::flush;
-
-        // calculate edges
-        int e=n*(n-1)/2, i;
-
-        Constraint c;
-        std::vector<int> tmp;
-
-        // clear constraints
-        clear_constraints();
-
-        // computing minimum size of constraint
-        int shift = (n-1)*(n-2)/2;
-
-        // remove all unnecessary constraints
-        BIGINT min_constraint = 1;
-        min_constraint<<=shift;
-
-        // get combinations for K_s 
-        v.clear();
-        tmp.clear();    
-        get_combinations(v,n,s,tmp);
-        c.sign = '<';
-        c.rhs = s*(s-1)/2;        
-        for (i=0;i<v.size();++i){
-            c.lhs = v[i];
-            if (c.lhs >= min_constraint) add_constraint(c);
-            //add_constraint(c);
-        }
-
-
-        // get combinations for K_t 
-        v.clear();
-        tmp.clear();
-        get_combinations(v,n,t,tmp);
-        c.sign = '>';
-        c.rhs = 0;
-        for (i=0;i<v.size();++i){
-            c.lhs = v[i];
-            if (c.lhs >= min_constraint) add_constraint(c);
-            //add_constraint(c);
-        }
-
-        //print_constraint();
-
-        //solve(n);
-        solve_using_edges(n);
-
-        std::cout << "# " << mpi_this_process << ": R(" << s << "," << t << "," << n << ") = " 
-                  << new_graphs_ptr->size() << " [" << (double(clock() - begin) / CLOCKS_PER_SEC) << "s]" << std::endl;
-
-        if (new_graphs_ptr->size()==0) {
-            // no ramsey graphs found
-            // current n is the Ramsey Number
-            break;
-        }
-
-        // point old graphs to new graphs for next iteration
-        std::set<BIGINT> *tmp_graphs;
-        tmp_graphs = old_graphs_ptr;
-        old_graphs_ptr = new_graphs_ptr;
-        new_graphs_ptr = tmp_graphs;
-
-        // clear new graphs (previously old graph)
-        // EDIT: no need to clear, this set is already emptied
-        // new_graphs_ptr->clear();
-        
-
-        // write graphs to file
-        if (mpi_num_processes > 1)
-            sprintf(filename, "/tmp/r_%d_%d_%d_%d.g6",  s, t, n, mpi_this_process);
-        else
-            sprintf(filename, "/tmp/r_%d_%d_%d.g6",  s, t, n);
-
-        write_to_file_g6(old_graphs_ptr, n, filename);
-
-    }
-
-    // wait till all processes are done
-    mpi_wait();
-
-
-}
-
-void Solver::mpi_wait(){
-    int a = 0;
-
-    // block till all processes are done
-    if (mpi_this_process==0){
-        MPI_Bcast(&a, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    }
-    else{
-        MPI_Bcast(&a, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    }
-}
-
-/*
-void Solver::solve_ramsey(int s, int t, int n){
-    
-    int e=n*(n-1)/2, i;
-
-    old_graphs_ptr->clear();
-    new_graphs_ptr->clear();
-
-    old_graphs_ptr->insert(0);
-
-    // create constraints
-    Constraint c;
-    std::vector<int> tmp;
-
-    // clear constraints
-    clear_constraints();
-
-    // computing minimum size of constraint
-    int shift = (n-1)*(n-2)/2;
-
-    // vector to store edges of complete graph
-    std::vector<BIGINT> v;    
-
-    // get combinations for K_t 
-    v.clear();
-    tmp.clear();
-    get_combinations(v,n,t,tmp);
-    for (i=0;i<v.size();i++){
-        c.lhs = v[i];
-        c.sign = '>';
-        c.rhs = 0;
-        add_constraint(c);
-    }
-
-    // get combinations for K_s 
-    v.clear();
-    tmp.clear();    
-    get_combinations(v,n,s,tmp);
-    for (i=0;i<v.size();i++){
-        c.lhs = v[i];
-        c.sign = '<';
-        c.rhs = s*(s-1)/2;
-        add_constraint(c);
-    }    
-
-
-    BIGINT y;
-    for (int edge_count = 1; edge_count<=e; edge_count++){
-        
-        for (std::set<BIGINT>::iterator it=old_graphs_ptr->begin(); it!=old_graphs_ptr->end(); ++it){
-
-            // for each old graph, create graphs with one more edge and check
-            for (shift=0;shift<e;shift++){
-                // create n using old graph and new edge
-                y=1;
-                y<<=shift;
-                y|=*it;
-
-                std::cout << binary_str(y,e) << std::endl;
-
-                if (y==*it) continue;
-
-                if (check(y)){
-                    new_graphs_ptr->insert(canon_label(y,n));
-                }                
-            }
-        
-
-        }
-
-        std::cout << "R(" << s << "," << t << "," << edge_count << "," << n << ") = " << new_graphs_ptr->size() << std::endl;
-
-        // point old graphs to new graphs for next iteration
-        std::set<BIGINT> *tmp_graphs;
-        tmp_graphs = old_graphs_ptr;
-        old_graphs_ptr = new_graphs_ptr;
-        new_graphs_ptr = tmp_graphs;
-
-        // clear new graphs (previously old graph)
-        new_graphs_ptr->clear();  
-
-        if (old_graphs_ptr->size()==0){
-            // no graphs created
-            // manually create graphs
-            v.clear();
-            tmp.clear();    
-            get_combinations(v,e,edge_count,tmp);
-            for (i=0;i<v.size();i++){
-                old_graphs_ptr->insert(v[i]);
-            }             
-        }
-
-    }
-
-
-}
-*/
-
-
-std::string Solver::get_g6(BIGINT n, int vertices){
-
-    int i,t;
-
-    int m = vertices*(vertices-1)/2;
-    std::string s="";
-
-    if (vertices<=62){
-    	s += (char)(vertices + 63);
-    }
-
-    BIGINT one = 1;
-    BIGINT tmp = 0;
-
-    while (m>0){
-
-        t=0;
-        // get six bits from back
-        for (i=0;i<6;i++){
-
-            t<<=1;
-
-            // check if last bit is set
-            tmp = n&one;
-            if (tmp==one) t|=1;
-
-            n>>=1;
-        }
-
-        t+=63;
-
-        s+=(char)t;
-
-        m-=6;
-    }
-
-    return s;
-
-}
-
-/*
-int Solver::popcount(BIGINT n){
-
-	bitset<64> b(n);
-	return b.count();
-
-}
-*/
-
 #ifndef MPZ_BIGINT
 
 inline int Solver::popcount(BIGINT x){
@@ -585,40 +384,3 @@ inline int Solver::popcount(BIGINT x){
 }
 
 #endif
-
-
-/*
-int __popcount(BIGINT x){
-	x =  x       - ((x >> 1)  & k1); // put count of each 2 bits into those 2 bits 
-	x = (x & k2) + ((x >> 2)  & k2); // put count of each 4 bits into those 4 bits 
-	x = (x       +  (x >> 4)) & k4 ; // put count of each 8 bits into those 8 bits 
-	x = (x * kf) >> 56; // returns 8 most significant bits of x + (x<<8) + (x<<16) + (x<<24) + ...  
-	return (int) x;
-}
-*/
-
-
-
-void Solver::write_to_file_g6(std::set<BIGINT> *graphs_ptr, int vertices, const char* filename){
-
-    char graph_g6_str[2048];
-    char command[100];
-
-    // open file for writing
-    std::ofstream g6_file;
-    g6_file.open(filename);
-
-    std::cout << "Writing " << graphs_ptr->size() << " graphs." << std::endl;
-
-    for (std::set<BIGINT>::iterator it=graphs_ptr->begin(); it != graphs_ptr->end(); ++it){
-        y_to_g6(*it, vertices, graph_g6_str);
-        g6_file << graph_g6_str;
-    }
-
-    g6_file.close();
-
-    // sort the file
-    sprintf(command, "LC_COLLATE=C sort -o '%s' '%s'", filename, filename);
-    int r = system(command);
-
-}
